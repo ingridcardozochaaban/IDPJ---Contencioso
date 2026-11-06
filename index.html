@@ -2195,7 +2195,7 @@ $("#btnPeca").onclick=async()=>{const txt=$("#pecaText").value.trim();if(!txt&&!
   try{const r=await sampleFn.json(pecaPrompt(cur,tipo,txt),{signal:pecaCtl.signal,modelTier:"default",...(pecaImages.length&&!txt?{images:pecaImages}:{})});
     $("#pecaSt").textContent="";showChanges(buildChanges(r||{},cur),r||{})}
   catch(e){const m={not_granted:"Uso do Claude não autorizado nesta página.",rate_limited:"Muitas solicitações seguidas. Tente de novo em instantes.",cancelled:"Leitura cancelada.",input_too_large:"Peça muito longa. Cole só as partes principais (qualificação, pedidos, dispositivo)."}[e&&e.code];
-    $("#pecaSt").textContent=m||"Não foi possível ler a peça. Tente de novo."}
+    $("#pecaSt").textContent=m||("Não foi possível ler a peça"+(e&&e.message?": "+String(e.message).slice(0,200):". Tente de novo."))}
   finally{btn.disabled=false}};
 $("#pecaRes").addEventListener("click",e=>{if(e.target.id==="pecaApply")applyChanges();if(e.target.id==="pecaDesc"){pecaPend=null;$("#pecaRes").innerHTML=""}});
 function resetPeca(){pecaImages=[];pecaPend=null;pecaAud=null;$("#pecaText").value="";$("#pecaRes").innerHTML="";$("#pecaSt").textContent="";$("#pecaTipo").value="";const st=$("#pecaText").parentElement.querySelector("[data-pdfst]");if(st)st.textContent=""}
@@ -2318,7 +2318,7 @@ ${decImages.length&&!txt?"(a decisão está nas imagens anexas, página por pág
     $("#decStatus").textContent="Resumo gerado. Confira com a decisão antes de salvar.";
   }catch(e){
     const m={not_granted:"Uso do Claude não autorizado nesta página.",rate_limited:"Muitas solicitações seguidas. Tente de novo em instantes.",cancelled:"Leitura cancelada.",input_too_large:"Texto muito longo. Cole só o dispositivo e a fundamentação principal."}[e&&e.code];
-    $("#decStatus").textContent=m||"Não foi possível gerar o resumo. Use “Ler valores do texto” e preencha os pedidos.";
+    $("#decStatus").textContent=m||("Não foi possível gerar o resumo"+(e&&e.message?": "+String(e.message).slice(0,200):"")+". Use “Ler valores do texto” e preencha os pedidos.");
     if(e&&e.code==="not_granted")btn.hidden=true;
   }finally{btn.disabled=false}
 };
