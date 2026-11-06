@@ -405,6 +405,29 @@ body.no-dec #decBox,body.no-dec #rDec{display:none!important}
   </div>
 
   <div id="tabProc" class="tabpane" hidden>
+    <section class="panel">
+      <div class="tools">
+        <h2>Base de processos</h2>
+        <div class="actions">
+          <input id="pq" type="search" placeholder="Buscar nº, reclamante, CPF, estatutário…" aria-label="Buscar processos">
+          <select id="pUnid" aria-label="Unidade"><option value="">Todas as unidades</option></select>
+          <select id="pStatus" aria-label="Fase"><option value="">Todas as fases</option></select>
+          <select id="pPos" aria-label="Fase do IDPJ"><option value="">IDPJ: todas as fases</option></select>
+          <select id="pDest" aria-label="Destaque"><option value="">Todos os destaques</option><option value="*">Qualquer destaque</option><option>REEF</option><option>Em face de Wagner Augusto Portugal</option><option>Em face de Wanessa Portugal</option></select>
+          <select id="pRisco" aria-label="Risco"><option value="">Todos os riscos</option><option>Crítico</option><option>Alto</option><option>Médio</option><option>Baixo</option><option value="-">Sem classificação</option></select>
+          <button type="button" id="pClear" class="ghost" hidden>Limpar filtros</button>
+          <button type="button" id="btnNewProc">+ Processo</button>
+        </div>
+      </div>
+      <div class="hint" id="pCount" style="margin-bottom:6px"></div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Processo</th><th>Reclamante</th><th>Projeto / unidade</th><th>IDPJ · estatutários</th><th>Fase</th><th>Principais pedidos</th><th class="money">Valor da execução / da causa</th><th>Risco</th><th>Quadro de credores</th><th>Próximo na agenda</th><th>Última atualização</th></tr></thead>
+          <tbody id="ptbody"></tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="kpis6" aria-label="Indicadores da carteira">
       <div class="kpi"><span class="eyebrow">Processos na base</span><b id="pk1">–</b><small id="pk1s">&nbsp;</small></div>
       <div class="kpi"><span class="eyebrow">Valor em execução</span><b id="pk2">–</b><small id="pk2s">&nbsp;</small></div>
@@ -427,29 +450,6 @@ body.no-dec #decBox,body.no-dec #rDec{display:none!important}
       <div class="panel" hidden><h2>Perícias</h2><div id="rPer" class="bars"></div></div>
       <div class="panel"><h2>Decisões</h2><div class="hint">Última decisão registrada em cada processo.</div><div id="rDec" class="bars"></div></div>
       <div class="panel"><h2>Quadro Geral de Credores</h2><div class="hint">Se o crédito do reclamante consta no quadro da insolvência da Pró-Saúde.</div><div id="rGrupo" class="bars"></div></div>
-    </section>
-
-    <section class="panel">
-      <div class="tools">
-        <h2>Base de processos</h2>
-        <div class="actions">
-          <input id="pq" type="search" placeholder="Buscar nº, reclamante, CPF, estatutário…" aria-label="Buscar processos">
-          <select id="pUnid" aria-label="Unidade"><option value="">Todas as unidades</option></select>
-          <select id="pStatus" aria-label="Fase"><option value="">Todas as fases</option></select>
-          <select id="pPos" aria-label="Fase do IDPJ"><option value="">IDPJ: todas as fases</option></select>
-          <select id="pDest" aria-label="Destaque"><option value="">Todos os destaques</option><option value="*">Qualquer destaque</option><option>REEF</option><option>Em face de Wagner Augusto Portugal</option><option>Em face de Wanessa Portugal</option></select>
-          <select id="pRisco" aria-label="Risco"><option value="">Todos os riscos</option><option>Crítico</option><option>Alto</option><option>Médio</option><option>Baixo</option><option value="-">Sem classificação</option></select>
-          <button type="button" id="pClear" class="ghost" hidden>Limpar filtros</button>
-          <button type="button" id="btnNewProc">+ Processo</button>
-        </div>
-      </div>
-      <div class="hint" id="pCount" style="margin-bottom:6px"></div>
-      <div class="tablewrap">
-        <table>
-          <thead><tr><th>Processo</th><th>Reclamante</th><th>Projeto / unidade</th><th>IDPJ · estatutários</th><th>Fase</th><th>Principais pedidos</th><th class="money">Valor da execução / da causa</th><th>Risco</th><th>Quadro de credores</th><th>Próximo na agenda</th><th>Última atualização</th></tr></thead>
-          <tbody id="ptbody"></tbody>
-        </table>
-      </div>
     </section>
   </div>
 </div>
