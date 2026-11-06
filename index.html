@@ -139,6 +139,7 @@ dialog::backdrop{background:rgba(10,16,22,.45)}
 .f.chk{flex-direction:row;align-items:center;gap:8px}
 .f.chk input{width:auto}
 .f input[type=checkbox],.f input[type=radio]{width:auto;flex:none;margin:0}
+#dlgRel{width:min(640px,calc(100vw - 32px))}.relcard{display:flex;flex-direction:column;gap:10px}.relcard[hidden]{display:none}.relcard h3{font-size:17px}
 .f label.chk2{font-size:13px;color:var(--fg);font-weight:500;flex-direction:row;text-align:left}
 textarea{resize:vertical}
 .parse{background:var(--surface-2);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
@@ -320,6 +321,9 @@ body.no-dec #decBox,body.no-dec #rDec{display:none!important}
       <button id="btnCsv" type="button" hidden>Exportar base (.csv)</button>
       <button id="btnExecTop" type="button" hidden title="Relatório completo e confidencial para a Diretoria, com nomes, estatutários e valores">📄 Relatório Diretoria (Word)</button>
       <button id="btnMacroTop" type="button" hidden title="Visão consolidada da carteira, só com totais: sem nomes de partes, estatutários ou números de processo">📊 Relatório macro (Word)</button>
+      <button id="btnRelProcTop" type="button" hidden title="Excel com resumo e uma linha por processo">📋 Relatório de processos</button>
+      <button id="btnRelAudTop" type="button" hidden title="Excel com a pauta e o calendário mensal das audiências">📅 Pauta de audiências</button>
+      <button id="btnRelPzTop" type="button" hidden title="Excel com o controle de prazos">⏱️ Prazos</button>
       <button id="btnNovoProc" type="button">+ Processo com IDPJ</button><button id="btnNovoProcOld" type="button" hidden></button>
       <button id="btnNew" type="button">+ Audiência</button>
       <button id="btnFol" type="button">+ Follow</button>
@@ -817,6 +821,35 @@ body.no-dec #decBox,body.no-dec #rDec{display:none!important}
         <button type="button" class="primary" id="btnXlsApply" disabled>Atualizar pauta</button>
       </div>
     </div>
+  </div>
+</dialog>
+
+<!-- Relatórios em Excel -->
+<dialog id="dlgRel">
+  <div class="dlg">
+    <div class="dlghead"><div><div class="eyebrow">Relatórios em Excel</div><h2>Baixar relatório</h2></div><button type="button" class="ghost" data-close="dlgRel" aria-label="Fechar">✕</button></div>
+    <section class="relcard" data-rel="proc">
+      <h3>Relatório de processos</h3>
+      <p class="hint">Aba de resumo (indicadores e totais por fase do IDPJ, estatutário, unidade, tribunal, QGC, tese e risco) e aba com uma linha por processo: reclamante, CPF, unidade, vara, fases, situação e citação do IDPJ, estatutários, tese, QGC, valores, risco, destaques, última decisão, acordo, próxima audiência e prazo, pontos de atenção e última atualização com a sigla.</p>
+      <label class="chk2"><input type="checkbox" id="rp_filtro"> Só os processos do filtro atual da aba Processos</label>
+      <label class="chk2"><input type="checkbox" id="rp_enc" checked> Incluir processos encerrados</label>
+      <div class="actions" style="justify-content:flex-end"><button type="button" class="primary" id="btnRelProc">Baixar relatório de processos</button></div>
+    </section>
+    <section class="relcard" data-rel="aud">
+      <h3>Pauta de audiências</h3>
+      <p class="hint">Data, hora, tipo e modalidade, processo, reclamante, unidade, vara, fase do IDPJ, estatutários, quem fará, preposto, testemunhas, defesa, o que falta na preparação e observações. Inclui uma aba de calendário para cada mês.</p>
+      <div class="form" style="grid-template-columns:1fr 1fr"><div class="f"><label for="ra_de">De</label><input type="date" id="ra_de"></div><div class="f"><label for="ra_ate">Até</label><input type="date" id="ra_ate"></div></div>
+      <label class="chk2"><input type="checkbox" id="ra_todas"> Incluir realizadas, canceladas e redesignadas</label>
+      <div class="actions" style="justify-content:flex-end"><button type="button" class="primary" id="btnRelAud">Baixar pauta de audiências</button></div>
+    </section>
+    <section class="relcard" data-rel="pz">
+      <h3>Prazos</h3>
+      <p class="hint">Prazo fatal, dias úteis restantes, situação (vencido, vence hoje, próximo, aberto, protocolado), providência, publicação e início da contagem, processo, reclamante, unidade, vara, fase do IDPJ, estatutários e responsável.</p>
+      <div class="form" style="grid-template-columns:1fr 1fr"><div class="f"><label for="rz_de">Prazo fatal de</label><input type="date" id="rz_de"></div><div class="f"><label for="rz_ate">até</label><input type="date" id="rz_ate"></div></div>
+      <label class="chk2"><input type="checkbox" id="rz_prot"> Incluir prazos protocolados e cancelados</label>
+      <div class="actions" style="justify-content:flex-end"><button type="button" class="primary" id="btnRelPz">Baixar prazos</button></div>
+    </section>
+    <div class="footbtns"><span class="hint" id="relSt"></span><button type="button" data-close="dlgRel">Fechar</button></div>
   </div>
 </dialog>
 
@@ -2885,7 +2918,216 @@ async function gerarRelatorioWord(macro,btn){
 $("#btnExecTop").onclick=()=>gerarRelatorioWord(false,$("#btnExecTop"));
 $("#btnMacroTop").onclick=()=>gerarRelatorioWord(true,$("#btnMacroTop"));
 /* os relatórios aparecem para quem pode baixar arquivos (mesma regra da exportação) */
-new MutationObserver(()=>{const h=$("#btnCsv").hidden;$("#btnExecTop").hidden=h;$("#btnMacroTop").hidden=h}).observe($("#btnCsv"),{attributes:true,attributeFilter:["hidden"]});
+new MutationObserver(()=>{const h=$("#btnCsv").hidden;["#btnExecTop","#btnMacroTop","#btnRelProcTop","#btnRelAudTop","#btnRelPzTop"].forEach(id=>{$(id).hidden=h})}).observe($("#btnCsv"),{attributes:true,attributeFilter:["hidden"]});
+
+/* ---------- relatórios em Excel: processos, pauta de audiências e prazos ---------- */
+let exceljsP=null;
+function loadExcelJS(){if(exceljsP)return exceljsP;exceljsP=new Promise((ok,ko)=>{if(window.ExcelJS)return ok(window.ExcelJS);const sc=document.createElement("script");sc.src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";sc.onload=()=>window.ExcelJS?ok(window.ExcelJS):ko(new Error("load"));sc.onerror=()=>ko(new Error("load"));document.head.appendChild(sc)});exceljsP.catch(()=>{exceljsP=null});return exceljsP}
+const dObj=v=>{if(!v)return null;const [y,m,d]=String(v).slice(0,10).split("-").map(Number);return y?new Date(Date.UTC(y,m-1,d,12)):null};
+const RC={navy:"FF0F4470",ink:"FF17222D",muted:"FF5B6876",line:"FFD5DCE3",zebra:"FFF4F7FA",soft:"FFDBE7F1",red:"FFA3302A",redS:"FFF6DCDA",ora:"FFB45309",oraS:"FFFDE8D3",yel:"FF8A6D00",yelS:"FFFBF1CF",grn:"FF1F6B45",grnS:"FFD9EFE2",pur:"FF5B3F8C",purS:"FFE9E2F5"};
+const RF="Calibri";
+const nowTxt=()=>new Date().toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",timeZone:"America/Sao_Paulo"}).replace(","," às");
+function rSheet(wb,name,{landscape=true}={}){
+  return wb.addWorksheet(name,{properties:{defaultRowHeight:16},views:[{showGridLines:false}],
+    pageSetup:{paperSize:9,orientation:landscape?"landscape":"portrait",fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,margins:{left:.4,right:.4,top:.5,bottom:.6,header:.25,footer:.3}},
+    headerFooter:{oddFooter:`&L&8IDPJ – Estatutários e diretores da Pró-Saúde&C&8Página &P de &N&R&8Gerado em ${nowTxt()}`}})}
+function rTitle(ws,ncol,title,sub){
+  ws.mergeCells(1,1,1,ncol);ws.mergeCells(2,1,2,ncol);ws.mergeCells(3,1,3,ncol);
+  const a=ws.getCell(1,1);a.value="IDPJ · ESTATUTÁRIOS E DIRETORES DA PRÓ-SAÚDE";a.font={name:RF,size:9,bold:true,color:{argb:RC.navy}};a.alignment={horizontal:"left",vertical:"middle"};ws.getRow(1).height=20;
+  const t=ws.getCell(2,1);t.value=title;t.font={name:RF,size:18,bold:true,color:{argb:RC.ink}};ws.getRow(2).height=28;
+  const s=ws.getCell(3,1);s.value=sub;s.font={name:RF,size:10,color:{argb:RC.muted}};
+  for(let c=1;c<=ncol;c++)ws.getCell(3,c).border={bottom:{style:"medium",color:{argb:RC.navy}}};
+  ws.getRow(4).height=8}
+/* tabela formatada: cols=[{h,w,t}] t: text|wrap|date|dt|money|int|center */
+function rTable(ws,r0,cols,rows,{freeze=false,filter=true,colorize}={}){
+  const al=c=>c.t==="money"||c.t==="int"?"right":c.t==="center"||c.t==="date"||c.t==="dt"?"center":"left";
+  const hr=ws.getRow(r0);cols.forEach((c,i)=>{const cl=hr.getCell(i+1);cl.value=c.h;cl.font={name:RF,size:10,bold:true,color:{argb:"FFFFFFFF"}};
+    cl.fill={type:"pattern",pattern:"solid",fgColor:{argb:RC.navy}};cl.alignment={vertical:"middle",horizontal:al(c),wrapText:true};
+    cl.border={bottom:{style:"thin",color:{argb:RC.navy}}};ws.getColumn(i+1).width=Math.max(ws.getColumn(i+1).width||0,c.w||12)});
+  hr.height=30;
+  rows.forEach((r,ri)=>{const row=ws.getRow(r0+1+ri);let maxLines=1;
+    cols.forEach((c,i)=>{const cl=row.getCell(i+1);let v=r[i];if(v===""||v===undefined)v=null;cl.value=v;
+      cl.font={name:RF,size:10,color:{argb:RC.ink}};
+      cl.alignment={vertical:"top",wrapText:c.t==="wrap"||c.t==="text",horizontal:al(c)};
+      if(c.t==="money")cl.numFmt='"R$" #,##0.00;[Red]-"R$" #,##0.00;"–"';
+      if(c.t==="date")cl.numFmt="dd/mm/yyyy";if(c.t==="dt")cl.numFmt="dd/mm/yyyy hh:mm";if(c.t==="int")cl.numFmt="0";
+      if(ri%2)cl.fill={type:"pattern",pattern:"solid",fgColor:{argb:RC.zebra}};
+      cl.border={bottom:{style:"hair",color:{argb:RC.line}}};
+      if(typeof v==="string"&&(c.t==="wrap"||c.t==="text")&&c.w){maxLines=Math.max(maxLines,v.split("\n").reduce((a,ln)=>a+Math.max(1,Math.ceil(ln.length/(c.w*1.2))),0))}
+      if(colorize)colorize(cl,c,v,r)});
+    row.height=Math.min(13.5*maxLines+4,120)});
+  if(freeze)ws.views=[{state:"frozen",ySplit:r0,xSplit:freeze===true?0:freeze,showGridLines:false}];
+  if(filter&&rows.length)ws.autoFilter={from:{row:r0,column:1},to:{row:r0+rows.length,column:cols.length}};
+  ws.pageSetup.printTitlesRow=`${r0}:${r0}`;
+  return r0+rows.length}
+function rChip(cl,txt,fg,bg){cl.font={name:RF,size:10,bold:true,color:{argb:fg}};cl.fill={type:"pattern",pattern:"solid",fgColor:{argb:bg}}}
+function rKpis(ws,r0,kpis,span=2){
+  kpis.forEach((k,i)=>{const c0=1+i*span;ws.mergeCells(r0,c0,r0,c0+span-1);ws.mergeCells(r0+1,c0,r0+1,c0+span-1);ws.mergeCells(r0+2,c0,r0+2,c0+span-1);
+    const a=ws.getCell(r0,c0),b=ws.getCell(r0+1,c0),s=ws.getCell(r0+2,c0);
+    a.value=k.l.toUpperCase();a.font={name:RF,size:8,bold:true,color:{argb:RC.muted}};
+    b.value=k.v;b.font={name:RF,size:20,bold:true,color:{argb:k.c||RC.ink}};if(k.money)b.numFmt='"R$" #,##0';
+    s.value=k.s||"";s.font={name:RF,size:9,color:{argb:RC.muted}};s.alignment={wrapText:true,vertical:"top"};
+    for(let rr=r0;rr<=r0+2;rr++)for(let cc=c0;cc<c0+span;cc++){const cl=ws.getCell(rr,cc);cl.fill={type:"pattern",pattern:"solid",fgColor:{argb:RC.zebra}};
+      cl.border={top:rr===r0?{style:"thin",color:{argb:RC.line}}:undefined,bottom:rr===r0+2?{style:"thin",color:{argb:RC.line}}:undefined,left:cc===c0?{style:"medium",color:{argb:k.c||RC.navy}}:undefined}}});
+  ws.getRow(r0+1).height=30;ws.getRow(r0+2).height=28;return r0+3}
+function rSection(ws,r,ncol,txt){ws.mergeCells(r,1,r,ncol);const c=ws.getCell(r,1);c.value=txt;c.font={name:RF,size:12,bold:true,color:{argb:RC.navy}};
+  for(let i=1;i<=ncol;i++)ws.getCell(r,i).border={bottom:{style:"thin",color:{argb:RC.line}}};ws.getRow(r).height=22;return r+1}
+async function saveWb(wb,filename){wb.creator="Pauta IDPJ";wb.created=new Date();
+  const buf=await wb.xlsx.writeBuffer();await downloads.save({filename,data:new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})})}
+async function runRel(btn,fn){if(!downloads){toast("Seu usuário não tem permissão para baixar relatórios.");return}btn.disabled=true;const t=btn.textContent;btn.textContent="Gerando…";
+  try{const n=await fn();const m=n===0?"Nenhum registro com essas opções.":`Arquivo gerado com ${n} linha(s).`;$("#relSt").textContent=m;toast(m)}
+  catch(e){console.error(e);const m=e&&e.message==="load"?"Não consegui carregar o gerador do Excel. Verifique a internet e tente de novo.":"Download não concluído.";$("#relSt").textContent=m;toast(m)}
+  finally{btn.disabled=false;btn.textContent=t}}
+const relHoje=()=>todayISO.split("-").reverse().join("-");
+function uteisAte(d){if(!d)return "";if(d===todayISO)return 0;let n=0,x=todayISO;if(d>todayISO){while(x<d){x=addDays(x,1);if(isWork(x))n++}return n}while(x>d){if(isWork(x))n--;x=addDays(x,-1)}return n}
+function nextAudOf(num){return sorted(items.filter(i=>audAtiva(i)&&sitOf(i)==="Agendada"&&i.processo===num&&i.data>=todayISO))[0]}
+function nextPzOf(num){return sorted(items.filter(i=>pzOpen(i)&&i.processo===num))[0]}
+const riskCol=(cl,v)=>{if(v==="Crítico"||v==="Alto")rChip(cl,v,RC.red,RC.redS);else if(v==="Médio")rChip(cl,v,RC.ora,RC.oraS);else if(v==="Baixo")rChip(cl,v,RC.grn,RC.grnS)};
+const idpjCol=(cl,v)=>{if(/pendente|acolhido/i.test(v||""))rChip(cl,v,RC.red,RC.redS);else if(/rejeitado|Encerrado/i.test(v||""))rChip(cl,v,RC.grn,RC.grnS);else if(/recurso/i.test(v||""))rChip(cl,v,RC.yel,RC.yelS)};
+const estsTxt=p=>estOf(p).map(estNome).join("\n");
+const varaTxt=(v,c,u)=>[properName(v||""),c&&(properName(c)+(u?"/"+String(u).toUpperCase():""))].filter(Boolean).join(" – ");
+
+/* abas de calendário mensal (uma por mês) da pauta de audiências */
+function rCalendar(wb,L){
+  const months=[...new Set(L.map(a=>a.data.slice(0,7)))].sort();
+  const tipoCurto=t=>{t=t||"";return /sess[ãa]o/i.test(t)?"Sessão":/instru/i.test(t)?"Instrução":/una/i.test(t)?"Una":/inicial|concilia/i.test(t)?"Inicial":(t.replace(/^Audiência (de )?/i,"").replace(/ (Presencial|Virtual|Telepresencial)$/i,"")||"Audiência")};
+  for(const ym of months){
+    const [y,m]=ym.split("-").map(Number);const mi=m-1;const evs=L.filter(a=>a.data.slice(0,7)===ym);
+    const ws=rSheet(wb,`Calendário ${MESES[mi].slice(0,3).replace(/^./,c=>c.toUpperCase())} ${y}`);
+    rTitle(ws,7,`Calendário de audiências – ${MESES[mi]} de ${y}`,`${evs.length} audiência(s) no mês · em vermelho: defesa do IDPJ pendente · posição em ${nowTxt()}`);
+    for(let c=1;c<=7;c++)ws.getColumn(c).width=c===1||c===7?22:30;
+    const H=ws.getRow(5);["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"].forEach((d,i)=>{const cl=H.getCell(i+1);cl.value=d;cl.font={name:RF,size:10,bold:true,color:{argb:"FFFFFFFF"}};cl.fill={type:"pattern",pattern:"solid",fgColor:{argb:RC.navy}};cl.alignment={horizontal:"center",vertical:"middle"}});H.height=20;
+    const first=new Date(y,mi,1),start=new Date(first);start.setDate(1-first.getDay());
+    const byDay={};for(const a of evs)(byDay[a.data] ||= []).push(a);
+    let r=6;
+    for(let w=0;w<6;w++){
+      const d0=new Date(start);d0.setDate(start.getDate()+w*7);if(w>0&&d0.getMonth()!==mi&&d0>first)break;
+      let maxLines=1;const row=ws.getRow(r);
+      for(let i=0;i<7;i++){
+        const d=new Date(d0);d.setDate(d0.getDate()+i);const k=iso(d),inM=d.getMonth()===mi;const cl=row.getCell(i+1);
+        const hol=HOL_NAC.has(k)?" · feriado":(inRecesso(k)?" · recesso":"");
+        const list=inM?sorted(byDay[k]||[]):[];
+        const rt=[{text:String(d.getDate())+(inM?hol:""),font:{name:RF,size:11,bold:true,color:{argb:inM?(hol?RC.red:RC.ink):"FFB5BEC8"}}}];
+        for(const a of list){const p=procOf(a.processo)||{};const flag=/defesa pendente/i.test(p.idpjFase||"");const st=sitOf(a);
+          const nome=(a.partes||p.partes||"").split(" ").slice(0,2).join(" ");const cor=st!=="Agendada"?RC.muted:flag?RC.red:RC.navy;
+          rt.push({text:`\n${a.hora||"s/h"} · ${tipoCurto(a.tipo)}${/virtual|telepresencial/i.test(a.tipo||"")?" (virtual)":/presencial/i.test(a.tipo||"")?" (presencial)":""}`,font:{name:RF,size:9,bold:true,color:{argb:cor},strike:st==="Cancelada"||st==="Redesignada"}});
+          rt.push({text:`\n${nome} · ${a.processo||""}${st!=="Agendada"?" · "+st.toLowerCase():""}`,font:{name:RF,size:8,color:{argb:st!=="Agendada"?RC.muted:flag?RC.red:RC.ink}}})}
+        cl.value={richText:rt};cl.alignment={vertical:"top",horizontal:"left",wrapText:true};
+        const fill=!inM?"FFF7F8FA":k===todayISO?RC.soft:list.some(a=>/defesa pendente/i.test((procOf(a.processo)||{}).idpjFase||"")&&sitOf(a)==="Agendada")?RC.redS:(d.getDay()===0||d.getDay()===6||hol)?RC.zebra:"FFFFFFFF";
+        cl.fill={type:"pattern",pattern:"solid",fgColor:{argb:fill}};
+        cl.border={top:{style:"thin",color:{argb:RC.line}},bottom:{style:"thin",color:{argb:RC.line}},left:{style:"thin",color:{argb:RC.line}},right:{style:"thin",color:{argb:RC.line}}};
+        maxLines=Math.max(maxLines,1+list.length*2)}
+      row.height=Math.max(70,maxLines*12+10);r++}
+    ws.pageSetup.fitToHeight=1}}
+
+/* 1. relatório de processos */
+async function relProcessos(){
+  let L=$("#rp_filtro").checked?procFiltered():procs.slice();if(!$("#rp_enc").checked)L=L.filter(p=>stGroup(p.status)!=="Encerrado");
+  L.sort((a,b)=>(a.unidade||"").localeCompare(b.unidade||"")||(a.partes||"").localeCompare(b.partes||""));if(!L.length)return 0;
+  const X=await loadExcelJS();const wb=new X.Workbook();
+  const sum=(arr,f)=>arr.reduce((a,p)=>a+(f(p)||0),0);
+  const ex=p=>isConexo(p)?0:(valExec(p)||0),vc=p=>isConexo(p)?0:(typeof p.valorCausa==="number"?p.valorCausa:0);
+  const ativos=L.filter(p=>stGroup(p.status)==="Ativo"),enc=L.filter(p=>stGroup(p.status)==="Encerrado");
+  const pend=L.filter(p=>/defesa pendente/i.test(p.idpjFase||"")),acol=L.filter(p=>/^Decidido – acolhido/.test(p.idpjFase||""));
+  const pzAb=items.filter(i=>pzOpen(i)&&L.some(p=>p.numero===i.processo));const pzV=pzAb.filter(i=>i.data<todayISO).length;
+  /* resumo */
+  const R=rSheet(wb,"Resumo",{landscape:false});const NC=10;
+  rTitle(R,NC,"Relatório dos incidentes de desconsideração (IDPJ)",`Posição em ${nowTxt()} · ${L.length} processo(s)${$("#rp_filtro").checked?" · conforme filtro aplicado":""}${$("#rp_enc").checked?"":" · sem encerrados"}`);
+  for(let c=1;c<=NC;c++)R.getColumn(c).width=13;
+  let r=rKpis(R,5,[
+    {l:"Processos",v:L.length,s:`${ativos.length} ativo(s) · ${enc.length} encerrado(s)`},
+    {l:"Valor da execução",v:sum(L,ex),money:1,s:"planilha da insolvência",c:RC.red},
+    {l:"Defesa do IDPJ pendente",v:pend.length,s:"estatutários citados",c:pend.length?RC.red:RC.ink},
+    {l:"IDPJ acolhido",v:acol.length,s:"estatutários incluídos",c:acol.length?RC.red:RC.ink},
+    {l:"Prazos em aberto",v:pzAb.length,s:pzV?`${pzV} vencido(s) sem protocolo`:"nenhum vencido",c:pzV?RC.red:RC.ink}]);
+  const grp=f=>{const m=new Map();for(const p of L){for(const k of [].concat(f(p)||"Não informado")){const o=m.get(k)||{n:0,v:0,c:0};o.n++;o.v+=ex(p);o.c+=vc(p);m.set(k,o)}}return [...m.entries()].sort((a,b)=>b[1].v-a[1].v||b[1].n-a[1].n)};
+  const block=(title,f,order)=>{r=rSection(R,r+1,NC,title);let g=grp(f);if(order)g.sort((a,b)=>(order.indexOf(a[0])+1||99)-(order.indexOf(b[0])+1||99));
+    const rows=g.map(([k,o])=>[k,o.n,o.c,o.v]);const tot=["Total",L.length,sum(L,vc),sum(L,ex)];
+    R.mergeCells(r,1,r,4);R.mergeCells(r,7,r,8);R.mergeCells(r,9,r,10);const hdr=R.getRow(r);[["",1],["Processos",5],["%",6],["Valor da causa",7],["Valor da execução",9]].forEach(([h,c])=>{const cl=hdr.getCell(c);cl.value=h;cl.font={name:RF,size:9,bold:true,color:{argb:RC.muted}};cl.alignment={horizontal:c>4?"right":"left"}});
+    [...rows,tot].forEach((row,i)=>{const rr=r+1+i;R.mergeCells(rr,1,rr,4);R.mergeCells(rr,7,rr,8);R.mergeCells(rr,9,rr,10);const isT=i===rows.length;
+      const set=(c,v,fmt)=>{const cl=R.getCell(rr,c);cl.value=v;cl.font={name:RF,size:10,bold:isT,color:{argb:RC.ink}};if(fmt)cl.numFmt=fmt;cl.alignment={horizontal:c>4?"right":"left",vertical:"middle"};
+        cl.border=isT?{top:{style:"thin",color:{argb:RC.ink}}}:{bottom:{style:"hair",color:{argb:RC.line}}}};
+      set(1,row[0]);set(5,row[1],"0");set(6,{formula:`E${rr}/E${r+1+rows.length}`},"0%");set(7,row[2],'"R$" #,##0');set(9,row[3],'"R$" #,##0')});
+    r=r+1+rows.length};
+  block("Por fase do IDPJ",p=>p.idpjFase||"Fase não informada",[...IDPJ_FASES,"Fase não informada"]);
+  block("Por estatutário (um incidente pode ter mais de um)",p=>estOf(p).length?estOf(p).map(estNome):["Estatutários a indicar"]);
+  block("Por unidade",p=>p.unidade||"Sem unidade");
+  block("Por tribunal",trtOf);
+  block("Quadro Geral de Credores",p=>qgcShort(p.qgc));
+  block("Tese do pedido de IDPJ",p=>p.idpjTese||"Não identificada");
+  block("Risco",p=>p.risco||"Sem classificação",RK_ORDER);
+  r=rSection(R,r+1,NC,"Critérios");
+  ["Valor da execução: planilha da insolvência da Pró-Saúde. Processos conexos não somam em dobro.","Na tabela por estatutário, um incidente com vários estatutários aparece em cada um deles; por isso a soma passa do total.","Fonte: pauta de IDPJ (base de processos e agenda)."]
+    .forEach(t=>{R.mergeCells(r,1,r,NC);const c=R.getCell(r,1);c.value="• "+t;c.font={name:RF,size:9,color:{argb:RC.muted}};c.alignment={wrapText:true,vertical:"top"};R.getRow(r).height=26;r++});
+  /* detalhe */
+  const D=rSheet(wb,"Processos");
+  const cols=[{h:"Nº do processo",w:25,t:"text"},{h:"Reclamante",w:26,t:"wrap"},{h:"CPF",w:15,t:"text"},{h:"Unidade",w:24,t:"wrap"},{h:"Vara / comarca",w:22,t:"wrap"},{h:"Tribunal",w:9,t:"center"},
+    {h:"Fase processual",w:16,t:"wrap"},{h:"Fase do IDPJ",w:20,t:"wrap"},{h:"Situação do IDPJ",w:30,t:"wrap"},{h:"Citação dos estatutários",w:12,t:"date"},{h:"Estatutários incluídos",w:28,t:"wrap"},{h:"Tese",w:18,t:"wrap"},
+    {h:"Habilitação",w:14,t:"wrap"},{h:"Quadro Geral de Credores",w:16,t:"wrap"},{h:"Valor no QGC",w:14,t:"money"},{h:"Valor da execução",w:15,t:"money"},{h:"Valor da causa",w:14,t:"money"},
+    {h:"Risco",w:9,t:"center"},{h:"Destaques",w:18,t:"wrap"},{h:"Última decisão",w:26,t:"wrap"},{h:"Acordo",w:18,t:"wrap"},{h:"Próxima audiência",w:28,t:"wrap"},{h:"Próximo prazo",w:24,t:"wrap"},{h:"Pontos de atenção",w:40,t:"wrap"},{h:"Última atualização",w:22,t:"wrap"}];
+  rTitle(D,cols.length,"Processos – detalhamento",`Posição em ${nowTxt()} · ${L.length} processo(s), ordenados por unidade e reclamante`);
+  const rows=L.map(p=>{const a=nextAudOf(p.numero),z=nextPzOf(p.numero),d=decsOf(p),ld=d[d.length-1],u=lastUpd(p);
+    return [p.numero||"",p.partes||"",p.cpf||"",p.unidade||"",varaTxt(p.vara,p.comarca,p.uf),trtOf(p),
+      stGroup(p.status)==="Ativo"?[p.faseProc,p.subfase].filter(Boolean).join(" – "):p.status,p.idpjFase||"",[p.idpjStatus,p.idpjResultado].filter(Boolean).join("\n"),dObj(p.idpjCitacao),estsTxt(p),p.idpjTese||"",
+      p.habilitacao||"",p.qgc?qgcShort(p.qgc):"",typeof p.valorQgc==="number"?p.valorQgc:null,valExec(p),typeof p.valorCausa==="number"?p.valorCausa:null,
+      p.risco||"",destOf(p).map(x=>destShort(x)).join("\n"),ld?`${decShort(ld.tipo)}${ld.data?" ("+fmtDate(ld.data)+")":""}: ${ld.respICDS||ld.resultado||""}`:"",
+      p.acordoPor?`${acordoShort(p)}${p.acordoData?", "+fmtDate(p.acordoData):""}${typeof p.acordoValor==="number"?", "+BRL.format(p.acordoValor):""}`:"",
+      a?`${fmtDate(a.data)}${a.hora?" "+a.hora:""} – ${a.tipo||"Audiência"}`:"",z?`${fmtDate(z.data)} – ${(PZ[z.tipoPrazo]||{}).n||z.tipoPrazo}`:"",relCut(p.observacoes,400),u.ts?`${fmtDH(u.ts)} · ${u.what}`:""]});
+  const end=rTable(D,5,cols,rows,{freeze:2,colorize:(cl,c,v)=>{if(c.h==="Risco")riskCol(cl,v);if(c.h==="Fase do IDPJ")idpjCol(cl,v);if(c.h==="Próximo prazo"&&v&&v.slice(0,10).split("/").reverse().join("-")<todayISO)rChip(cl,v,RC.red,RC.redS);if(c.h==="Destaques"&&/ALERTA/.test(v||""))rChip(cl,v,RC.red,RC.redS)}});
+  const trow=D.getRow(end+1);trow.getCell(1).value="Total";trow.getCell(1).font={name:RF,size:10,bold:true};
+  for(const [i,f] of [[15,"O"],[16,"P"],[17,"Q"]]){const c=trow.getCell(i);c.value={formula:`SUBTOTAL(9,${f}6:${f}${end})`};c.numFmt='"R$" #,##0.00';c.font={name:RF,size:10,bold:true};c.border={top:{style:"thin",color:{argb:RC.ink}}}}
+  D.pageSetup.paperSize=8;
+  await saveWb(wb,`Relatorio_processos_IDPJ_${relHoje()}.xlsx`);return rows.length}
+
+/* 2. pauta de audiências */
+async function relPauta(){
+  const de=$("#ra_de").value||"0000",ate=$("#ra_ate").value||"9999",todas=$("#ra_todas").checked;
+  const L=sorted(items.filter(i=>isAud(i)&&i.data>=de&&i.data<=ate&&(todas||sitOf(i)==="Agendada")));if(!L.length)return 0;
+  const X=await loadExcelJS();const wb=new X.Workbook();const W=rSheet(wb,"Pauta de audiências");
+  const cols=[{h:"Data",w:11,t:"date"},{h:"Dia",w:6,t:"center"},{h:"Hora",w:7,t:"center"},{h:"Tipo",w:30,t:"wrap"},{h:"Modalidade",w:11,t:"center"},{h:"Processo",w:25,t:"text"},{h:"Reclamante",w:26,t:"wrap"},
+    {h:"Unidade",w:22,t:"wrap"},{h:"Vara / comarca",w:20,t:"wrap"},{h:"Fase do IDPJ",w:20,t:"wrap"},{h:"Estatutários",w:26,t:"wrap"},{h:"Quem fará / advogado",w:24,t:"wrap"},{h:"Preposto",w:20,t:"wrap"},{h:"Testemunhas",w:24,t:"wrap"},
+    {h:"Defesa protocolada?",w:13,t:"center"},{h:"O que falta",w:30,t:"wrap"},{h:"Situação",w:13,t:"center"},{h:"Observações / link",w:30,t:"wrap"}];
+  const fmtR=s=>s.split("-").reverse().join("/");
+  rTitle(W,cols.length,"Pauta de audiências",`${de==="0000"?"":"De "+fmtR(de)}${ate==="9999"?"":" a "+fmtR(ate)} · ${L.length} audiência(s) · posição em ${nowTxt()}`);
+  const rows=L.map(a=>{const p=procOf(a.processo)||{};const r=sitOf(a)==="Agendada"?readiness(a):null;const ck=a.checklist||{};
+    return [dObj(a.data),DOW[parseISO(a.data).getDay()],a.hora||"",(a.tipo||"Audiência").replace(/ (Presencial|Virtual|Telepresencial)$/i,""),/virtual|telepresencial/i.test(a.tipo||"")?"Virtual":/presencial/i.test(a.tipo||"")?"Presencial":"",
+      a.processo||"",a.partes||p.partes||"",p.unidade||"",varaTxt(a.vara||p.vara,a.comarca||p.comarca,a.uf||p.uf),p.idpjFase||"",estsTxt(p),
+      [...new Set([a.quem,a.correspNome&&("Correspondente: "+a.correspNome+(a.correspTel?" · "+a.correspTel:"")),a.advInterno,p.advogado].filter(Boolean))].join("\n"),[a.prepostoNome,a.prepostoTel].filter(Boolean).join(" · "),
+      (a.testemunhas||[]).map(t=>`${t.nome}${t.status?" ("+t.status.toLowerCase()+")":""}`).join("\n"),
+      ck.defesa?(ck.defesa.st==="Feito"?"Sim":ck.defesa.st==="N/A"?"Não se aplica":"Não"):(/una|inicial/i.test(a.tipo||"")?"Não":"Não se aplica"),r?r.pend.map(x=>`${x.n} (até ${fmtShort(x.prazo)})`).join("\n"):"",
+      sitOf(a)+(a.redesignadaPara?" → "+fmtDate(a.redesignadaPara):""),a.obs||""]});
+  rTable(W,5,cols,rows,{freeze:3,colorize:(cl,c,v,row)=>{if(c.h==="Fase do IDPJ")idpjCol(cl,v);if(c.h==="Defesa protocolada?"&&v==="Não")rChip(cl,v,RC.ora,RC.oraS);if(c.h==="Defesa protocolada?"&&v==="Sim")rChip(cl,v,RC.grn,RC.grnS);if(c.h==="Defesa protocolada?"&&v==="Não se aplica")cl.font={name:RF,size:9,color:{argb:RC.muted}};
+    if(c.h==="Situação"&&v!=="Agendada")cl.font={name:RF,size:10,italic:true,color:{argb:RC.muted}};
+    if(c.h==="Data"&&row[0]&&row[0].toISOString().slice(0,10)===todayISO)rChip(cl,"",RC.navy,RC.soft)}});
+  W.pageSetup.paperSize=8;
+  rCalendar(wb,L);
+  await saveWb(wb,`Pauta_audiencias_IDPJ${de==="0000"?"":"_"+de.split("-").reverse().join("-")}${ate==="9999"?"":"_a_"+ate.split("-").reverse().join("-")}.xlsx`);return rows.length}
+
+/* 3. prazos */
+async function relPrazos(){
+  const de=$("#rz_de").value||"0000",ate=$("#rz_ate").value||"9999",prot=$("#rz_prot").checked;
+  const L=sorted(items.filter(i=>isPz(i)&&i.data>=de&&i.data<=ate&&(prot||pzOpen(i))));if(!L.length)return 0;
+  const X=await loadExcelJS();const wb=new X.Workbook();const W=rSheet(wb,"Prazos");
+  const stOfZ=z=>z.status==="Protocolado"?"Protocolado":z.status==="Cancelado"?"Cancelado":z.data<todayISO?"Vencido":z.data===todayISO?"Vence hoje":uteisAte(z.data)<=3?"Próximo":"Aberto";
+  const cnt=k=>L.filter(z=>stOfZ(z)===k).length;
+  const cols=[{h:"Prazo fatal",w:11,t:"date"},{h:"Dia",w:6,t:"center"},{h:"Dias úteis restantes",w:10,t:"int"},{h:"Situação",w:12,t:"center"},{h:"Providência",w:28,t:"wrap"},{h:"Dias",w:6,t:"int"},
+    {h:"Publicação",w:11,t:"date"},{h:"Início da contagem",w:11,t:"date"},{h:"Processo",w:25,t:"text"},{h:"Reclamante",w:26,t:"wrap"},{h:"Unidade",w:22,t:"wrap"},{h:"Vara / comarca",w:20,t:"wrap"},
+    {h:"Fase do IDPJ",w:20,t:"wrap"},{h:"Estatutários",w:26,t:"wrap"},{h:"Responsável",w:15,t:"wrap"},{h:"Protocolado em",w:14,t:"dt"},{h:"Observações",w:34,t:"wrap"}];
+  rTitle(W,cols.length,"Controle de prazos",`Posição em ${nowTxt()} · ${L.length} prazo(s) · ${cnt("Vencido")} vencido(s) · ${cnt("Vence hoje")} vence(m) hoje · ${cnt("Próximo")} em até 3 dias úteis`);
+  const rows=L.map(z=>{const p=procOf(z.processo)||{};
+    return [dObj(z.data),DOW[parseISO(z.data).getDay()],!pzOpen(z)?null:uteisAte(z.data),stOfZ(z),((PZ[z.tipoPrazo]||{}).n||z.tipoPrazo||"")+(z.dobro?" (em dobro)":""),z.dias||null,dObj(z.dataPub),dObj(z.inicio),
+      z.processo||"",z.partes||p.partes||"",p.unidade||"",varaTxt(z.vara||p.vara,z.comarca||p.comarca,p.uf),p.idpjFase||"",estsTxt(p),z.executor||"",z.protocoladoEm?new Date(z.protocoladoEm):null,z.obs||""]});
+  rTable(W,5,cols,rows,{freeze:1,colorize:(cl,c,v)=>{if(c.h==="Fase do IDPJ")idpjCol(cl,v);if(c.h!=="Situação")return;({"Vencido":()=>rChip(cl,v,RC.red,RC.redS),"Vence hoje":()=>rChip(cl,v,RC.ora,RC.oraS),"Próximo":()=>rChip(cl,v,RC.yel,RC.yelS),"Aberto":()=>rChip(cl,v,RC.navy,RC.soft),"Protocolado":()=>rChip(cl,v,RC.grn,RC.grnS),"Cancelado":()=>rChip(cl,v,RC.muted,"FFEAEEF2")}[v]||(()=>{}))()}});
+  await saveWb(wb,`Prazos_IDPJ_${relHoje()}.xlsx`);return rows.length}
+
+/* abre a janela de opções mostrando só o relatório escolhido */
+function abrirRel(qual){document.querySelectorAll("#dlgRel .relcard").forEach(s=>s.hidden=s.dataset.rel!==qual);
+  if(!$("#ra_de").value){$("#ra_de").value=todayISO;$("#ra_ate").value=addDays(todayISO,90)}
+  $("#relSt").textContent="Excel formatado: título, resumo, filtros, cabeçalho fixo e pronto para impressão.";openDlg("dlgRel")}
+$("#btnRelProcTop").onclick=()=>abrirRel("proc");$("#btnRelAudTop").onclick=()=>abrirRel("aud");$("#btnRelPzTop").onclick=()=>abrirRel("pz");
+$("#btnRelProc").onclick=()=>runRel($("#btnRelProc"),relProcessos);
+$("#btnRelAud").onclick=()=>runRel($("#btnRelAud"),relPauta);
+$("#btnRelPz").onclick=()=>runRel($("#btnRelPz"),relPrazos);
 
 /* expõe funções puras para teste */
 $("#pDest").addEventListener("change",renderProc);
