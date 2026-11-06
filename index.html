@@ -138,6 +138,8 @@ dialog::backdrop{background:rgba(10,16,22,.45)}
 .f input,.f select,.f textarea{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);width:100%;min-width:0}
 .f.chk{flex-direction:row;align-items:center;gap:8px}
 .f.chk input{width:auto}
+.f input[type=checkbox],.f input[type=radio]{width:auto;flex:none;margin:0}
+.f label.chk2{font-size:13px;color:var(--fg);font-weight:500;flex-direction:row;text-align:left}
 textarea{resize:vertical}
 .parse{background:var(--surface-2);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
 .parse textarea{min-height:90px;font-family:var(--f-mono);font-size:12px}
@@ -268,6 +270,7 @@ th.money{text-align:right}
 .xprev h3{font-size:14px;padding:10px 8px 4px}
 #xSum .chip{cursor:pointer;border:0;font:inherit;font-size:11.5px;padding:2px 9px}
 @media (max-width:560px){.xmap{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 /* login e usuários */
 .loginwrap{min-height:calc(100vh - 80px);display:grid;place-items:center}
 .logincard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px 24px;width:min(420px,100%);display:flex;flex-direction:column;gap:14px}
@@ -315,6 +318,8 @@ body.no-dec #decBox,body.no-dec #rDec{display:none!important}
       <span class="chip acc" id="userSigla" style="font-size:12px;padding:3px 9px"></span><button id="btnUsuarios" type="button" hidden>Usuários</button><button id="btnSair" type="button" class="ghost">Sair</button>
       <button id="btnIcs" type="button" hidden>Exportar calendário (.ics)</button>
       <button id="btnCsv" type="button" hidden>Exportar base (.csv)</button>
+      <button id="btnExecTop" type="button" hidden title="Relatório completo e confidencial para a Diretoria, com nomes, estatutários e valores">📄 Relatório Diretoria (Word)</button>
+      <button id="btnMacroTop" type="button" hidden title="Visão consolidada da carteira, só com totais: sem nomes de partes, estatutários ou números de processo">📊 Relatório macro (Word)</button>
       <button id="btnNovoProc" type="button">+ Processo com IDPJ</button><button id="btnNovoProcOld" type="button" hidden></button>
       <button id="btnNew" type="button">+ Audiência</button>
       <button id="btnFol" type="button">+ Follow</button>
@@ -2722,6 +2727,165 @@ $("#btnXlsApply").onclick=async()=>{const P=xlsPlan;if(!P)return;if(!col){toast(
   const msg=[nN?`${nN} incluído(s)`:"",nU?`${nU} atualizado(s)`:"",nB?`${nB} baixado(s)`:"",nP?`${nP} processo(s) cadastrado(s)`:""].filter(Boolean).join(" · ");
   if(fail){toast(`${msg||"Nada gravado"}. ${fail} falha(s): confira e importe de novo (o que já entrou aparece como “sem mudança”).`);btn.disabled=false;return}
   closeDlg("dlgXls");if(P.lo){const d=parseISO(P.lo);view={y:d.getFullYear(),m:d.getMonth()}}selDay=null;render();toast(`Pauta atualizada: ${msg||"nenhuma alteração"}.`)};
+
+/* ---------- relatórios em Word: Diretoria (completo e confidencial) e macro (só totais, sem nomes) ---------- */
+let docxP=null;
+function loadDocx(){if(docxP)return docxP;docxP=new Promise((ok,ko)=>{if(window.docx&&window.docx.Packer)return ok(window.docx);const sc=document.createElement("script");sc.src="https://cdn.jsdelivr.net/npm/docx@9.5.0/dist/index.iife.js";sc.onload=()=>window.docx&&window.docx.Packer?ok(window.docx):ko(new Error("load"));sc.onerror=()=>ko(new Error("load"));document.head.appendChild(sc)});docxP.catch(()=>{docxP=null});return docxP}
+const relCut=(t,n)=>{t=String(t||"").replace(/\s+/g," ").trim();return t.length>n?t.slice(0,n).replace(/[ ,;.]+\S*$/,"")+"…":t};
+const relHojeTag=()=>todayISO.split("-").reverse().join("-");
+async function gerarRelatorioWord(macro,btn){
+  if(!downloads){toast("Seu usuário não tem permissão para baixar relatórios.");return}
+  const txt0=btn.textContent;btn.disabled=true;btn.textContent="Gerando…";
+  try{
+  const D=await loadDocx();
+  const {Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,WidthType,AlignmentType,BorderStyle,ShadingType,Header,Footer,PageNumber,LevelFormat,VerticalAlign}=D;
+  const FONT="Calibri",NAVY="1D4F73",INK="17222D",MUT="5B6876",LINE="D5DCE3",ZEB="F4F7FA",RED="A3302A",REDS="F6DCDA",ORA="B45309",GRN="1F6B45",SOFT="DBE7F1";
+  const W=9026;
+  const sum=(a,f)=>a.reduce((s,p)=>s+(f(p)||0),0);
+  const ex=p=>isConexo(p)?0:(valExec(p)||0);
+  const BRL0=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0}),R$=v=>BRL0.format(v||0),Rc=v=>BRLc.format(v||0),pct=(a,b)=>b?Math.round(a/b*100)+"%":"0%";
+  const tr=(t,o={})=>new TextRun({text:String(t??""),font:FONT,size:o.size||22,bold:o.bold,italics:o.it,color:o.color||INK});
+  const P=(runs,o={})=>new Paragraph({children:(Array.isArray(runs)?runs:[tr(runs,o)]),spacing:{before:o.before??0,after:o.after??120,line:o.line||276},alignment:o.align||(o.bullet?AlignmentType.JUSTIFIED:undefined),keepNext:o.keepNext,numbering:o.bullet?{reference:"bul",level:0}:undefined,border:o.border,shading:o.shade?{type:ShadingType.CLEAR,color:"auto",fill:o.shade}:undefined});
+  const H1=t=>new Paragraph({children:[tr(t,{size:28,bold:true,color:NAVY})],spacing:{before:320,after:120},keepNext:true,border:{bottom:{style:BorderStyle.SINGLE,size:6,color:NAVY,space:4}}});
+  const NOTE=t=>P([tr(t,{size:17,it:true,color:MUT})],{after:160});
+  const bd={style:BorderStyle.SINGLE,size:4,color:LINE},BORD={top:bd,bottom:bd,left:bd,right:bd};
+  const cell=(content,w,o={})=>new TableCell({width:{size:w,type:WidthType.DXA},borders:o.borders||BORD,verticalAlign:o.va||VerticalAlign.CENTER,
+    shading:o.fill?{type:ShadingType.CLEAR,color:"auto",fill:o.fill}:undefined,margins:{top:60,bottom:60,left:100,right:100},
+    children:(Array.isArray(content)?content:[content]).map(c=>c instanceof Paragraph?c:new Paragraph({alignment:o.align,spacing:{after:0},children:String(c??"").split("\n").flatMap((l,i)=>[...(i?[new TextRun({break:1})]:[]),tr(l,{size:o.size||17,bold:o.bold,color:o.color})])}))});
+  const table=(cols,rows,style)=>{const tw=cols.reduce((s,c)=>s+c.w,0),ws=cols.map(c=>Math.floor(W*c.w/tw));ws[ws.length-1]+=W-ws.reduce((a,b)=>a+b,0);
+    const al=c=>c.a==="r"?AlignmentType.RIGHT:c.a==="c"?AlignmentType.CENTER:AlignmentType.LEFT;
+    const head=new TableRow({tableHeader:true,children:cols.map((c,i)=>cell(c.h,ws[i],{fill:NAVY,color:"FFFFFF",bold:true,align:al(c)}))});
+    const body=rows.map((r,ri)=>new TableRow({cantSplit:true,children:r.map((v,ci)=>{const s=(style&&style(ri,ci,v,r))||{};return cell(v,ws[ci],{fill:s.fill||(ri%2?ZEB:undefined),color:s.color,bold:s.bold||r.__total,align:al(cols[ci])})})}));
+    return new Table({width:{size:W,type:WidthType.DXA},columnWidths:ws,rows:[head,...body]})};
+  const total=a=>{a.__total=true;return a};
+  const rkColor=v=>({"Crítico":RED,"Alto":ORA,"Médio":"8A6D00","Baixo":GRN})[v];
+
+  /* ---- dados ---- */
+  const L=procs.slice(),vivos=L.filter(p=>stGroup(p.status)!=="Encerrado"),enc=L.filter(p=>stGroup(p.status)==="Encerrado");
+  const princ=vivos.filter(p=>!isConexo(p)),execTot=sum(princ,ex),semValor=princ.filter(p=>valExec(p)==null).length;
+  const fase=p=>p.idpjFase||"Fase não informada";
+  const pend=vivos.filter(p=>/defesa pendente/i.test(p.idpjFase||""));
+  const acolh=vivos.filter(p=>/^Decidido – acolhido/.test(p.idpjFase||""));
+  const rejeit=vivos.filter(p=>/rejeitado/i.test(p.idpjFase||""));
+  const recurso=vivos.filter(p=>/recurso/i.test(p.idpjFase||""));
+  const ca=vivos.filter(p=>p.risco==="Crítico"||p.risco==="Alto").sort((a,b)=>ex(b)-ex(a));
+  const qgcSim=vivos.filter(p=>/^Consta/.test(p.qgc||""));
+  const pzD=sorted(items.filter(i=>isPz(i)&&pzOpen(i)&&i.tipoPrazo==="DIDPJ"));
+  const decR=decs.filter(d=>(d.data||"")>=addDays(todayISO,-60)).sort((a,b)=>(b.data||"").localeCompare(a.data||""));
+  const decFav=decR.filter(d=>/rejeitado|extinto/i.test(d.respICDS||"")),decDesf=decR.filter(d=>/acolhido/i.test(d.respICDS||""));
+  const ymOf=d=>(d||"").slice(0,7),ymAdd=(ym,k)=>{const [y,m]=ym.split("-").map(Number);const d=new Date(y,m-1+k,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")};
+  const ymHoje=ymOf(todayISO),meses=[-3,-2,-1,0,1,2].map(k=>ymAdd(ymHoje,k));
+  const audsM=ym=>items.filter(i=>isAud(i)&&audAtiva(i)&&ymOf(i.data)===ym).length,pzsM=ym=>items.filter(i=>isPz(i)&&i.status!=="Cancelado"&&ymOf(i.data)===ym).length;
+  const mesNome=ym=>{const [y,m]=ym.split("-").map(Number);return MESES[m-1].replace(/^./,c=>c.toUpperCase())+"/"+y};
+  const agora=new Date().toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",timeZone:"America/Sao_Paulo"}).replace(",","");
+  const grp=(lista,keyFn,order)=>{const m=new Map();for(const p of lista){for(const k of [].concat(keyFn(p))){const o=m.get(k)||[];o.push(p);m.set(k,o)}}
+    let ks=[...m.keys()];if(order)ks.sort((a,b)=>(order.indexOf(a)+1||99)-(order.indexOf(b)+1||99));else ks.sort((a,b)=>sum(m.get(b),ex)-sum(m.get(a),ex)||m.get(b).length-m.get(a).length);return ks.map(k=>[k,m.get(k)])};
+  const tabGrp=(titulo,lista,keyFn,order,style)=>table([{h:titulo,w:4},{h:"Incidentes",w:1.3,a:"c"},{h:"Valor da execução",w:2.4,a:"r"},{h:"% do total",w:1.3,a:"c"}],
+    [...grp(lista,keyFn,order).map(([k,a])=>[k,String(a.length),R$(sum(a,ex)),pct(sum(a,ex),execTot)]),total(["Total",String(lista.length),R$(sum(lista.filter(p=>!isConexo(p)),ex)),"100%"])],style);
+  const FASE_ORD=[...IDPJ_FASES,"Fase não informada"];
+  const C=[];
+  {const hj=parseISO(todayISO);C.push(P([tr(`${hj.getDate()} de ${MESES[hj.getMonth()]} de ${hj.getFullYear()}`,{size:18,color:MUT})],{after:40,align:AlignmentType.RIGHT}))}
+  if(!macro)C.push(P([tr("CONFIDENCIAL – USO RESTRITO DA DIRETORIA",{size:16,bold:true,color:RED})],{before:200,after:60,align:AlignmentType.CENTER}));
+  C.push(P([tr(macro?"Relatório Consolidado dos Incidentes de Desconsideração":"Relatório Executivo – Incidentes de Desconsideração",{size:36,bold:true,color:NAVY})],{before:macro?200:0,after:60,align:AlignmentType.CENTER}));
+  C.push(P([tr("Defesa dos estatutários e diretores da Pró-Saúde (IDPJ)",{size:22,color:MUT})],{after:40,align:AlignmentType.CENTER}));
+  C.push(P([tr(`Posição em ${agora}`,{color:MUT})],{after:240,align:AlignmentType.CENTER,border:{bottom:{style:BorderStyle.SINGLE,size:12,color:NAVY,space:6}}}));
+
+  /* indicadores */
+  const kpi=(v,l,s,c)=>[P([tr(v,{size:30,bold:true,color:c||NAVY})],{after:20}),P([tr(l,{size:16,bold:true})],{after:10}),P([tr(s||"",{size:15,color:MUT})],{after:0})];
+  const kw=Math.floor(W/4),kb={bottom:bd,left:{style:BorderStyle.NIL},right:{style:BorderStyle.NIL}};
+  const krow=arr=>new TableRow({children:arr.map(([v,l,s,c])=>cell(kpi(v,l,s,c),kw,{borders:{...kb,top:{style:BorderStyle.SINGLE,size:18,color:c||NAVY}},va:VerticalAlign.TOP}))});
+  C.push(new Table({width:{size:kw*4,type:WidthType.DXA},columnWidths:[kw,kw,kw,kw],rows:[
+    krow([[String(vivos.length),"Incidentes em andamento",`${enc.length} encerrado(s)`],[Rc(execTot),"Valor em execução",semValor?`${semValor} sem valor informado`:"planilha da insolvência",RED],[String(pend.length),"Defesa pendente",`${pzD.length} prazo(s) de defesa em aberto`,RED],[String(acolh.length),"IDPJ acolhido","estatutários incluídos",RED]]),
+    krow([[String(rejeit.length),"IDPJ rejeitado","",GRN],[String(recurso.length),"Em recurso","agravo de petição ou TST"],[String(ca.length),"Risco crítico ou alto",`${Rc(sum(ca,ex))} em execução`,ORA],[String(qgcSim.length),"Crédito no QGC",`${pct(qgcSim.length,vivos.length)} dos incidentes`,GRN]])]}));
+  C.push(P("",{after:60}));
+
+  if(macro){
+    C.push(H1("1. Resumo"));
+    [`A carteira tem ${vivos.length} incidente(s) de desconsideração em andamento, com ${R$(execTot)} em valor de execução.`,
+     `${pend.length} incidente(s) aguardam a defesa dos estatutários; ${acolh.length} foram acolhidos (estatutários incluídos no polo) e ${rejeit.length} rejeitados.`,
+     `${ca.length} incidente(s) estão classificados como risco crítico ou alto, concentrando ${pct(sum(ca,ex),execTot)} do valor em execução.`,
+     `${qgcSim.length} crédito(s) já constam do Quadro Geral de Credores da insolvência da Pró-Saúde.`,
+     decR.length?`Nos últimos 60 dias foram registradas ${decR.length} decisão(ões): ${decFav.length} favorável(is) e ${decDesf.length} desfavorável(is) aos estatutários.`:"",
+     `Agenda de ${mesNome(ymHoje)}: ${audsM(ymHoje)} audiência(s) e ${pzsM(ymHoje)} prazo(s).`].filter(Boolean).forEach(t=>C.push(P(t,{bullet:true,after:80})));
+    C.push(H1("2. Situação dos incidentes"));C.push(tabGrp("Fase do IDPJ",vivos,fase,FASE_ORD));
+    C.push(H1("3. Risco"));C.push(tabGrp("Risco",vivos,p=>p.risco||"Sem classificação",RK_ORDER,(ri,ci,v)=>ci===0&&rkColor(v)?{color:rkColor(v),bold:true}:null));
+    C.push(H1("4. Tese do pedido de desconsideração"));C.push(tabGrp("Tese",vivos,p=>p.idpjTese||"Não identificada"));
+    C.push(H1("5. Por tribunal"));C.push(tabGrp("Tribunal",vivos,trtOf));
+    C.push(H1("6. Por unidade de origem do crédito"));C.push(tabGrp("Unidade",vivos,p=>p.unidade||"Sem unidade"));
+    C.push(H1("7. Quadro Geral de Credores"));C.push(tabGrp("Situação no QGC",vivos,p=>qgcShort(p.qgc)));
+    C.push(H1("8. Agenda – audiências e prazos por mês"));
+    C.push(table([{h:"Mês",w:3},{h:"Audiências",w:2,a:"c"},{h:"Prazos",w:2,a:"c"}],[...meses.map(ym=>[mesNome(ym)+(ym===ymHoje?" (atual)":""),String(audsM(ym)),String(pzsM(ym))]),total(["Total",String(meses.reduce((s,ym)=>s+audsM(ym),0)),String(meses.reduce((s,ym)=>s+pzsM(ym),0))])],(ri,ci,v,r)=>/\(atual\)/.test(r[0])?{bold:true,fill:SOFT}:null));
+    C.push(NOTE("Valor da execução: planilha da insolvência da Pró-Saúde. Processos conexos não somam em dobro."));
+    C.push(P([tr("Visão consolidada: este relatório não identifica partes, estatutários ou processos.",{size:16,it:true,color:MUT})],{before:360,align:AlignmentType.CENTER}));
+  }else{
+    C.push(H1("1. Destaques"));
+    const dest=[`A carteira tem ${vivos.length} incidente(s) em andamento e ${R$(execTot)} em valor de execução${semValor?` (${semValor} incidente(s) ainda sem valor informado)`:""}.`];
+    if(pend.length)dest.push(`${pend.length} incidente(s) com estatutários citados e defesa ainda pendente; ${pzD.length} prazo(s) de defesa em aberto (item 4).`);
+    if(acolh.length)dest.push(`${acolh.length} incidente(s) acolhidos, com inclusão de estatutários no polo passivo, somando ${R$(sum(acolh,ex))} em execução (item 5).`);
+    if(rejeit.length)dest.push(`${rejeit.length} incidente(s) rejeitados.`);
+    if(ca.length)dest.push(`${ca.length} incidente(s) de risco crítico ou alto concentram ${pct(sum(ca,ex),execTot)} do valor em execução (item 6).`);
+    dest.push(`${qgcSim.length} crédito(s) já constam do Quadro Geral de Credores da insolvência da Pró-Saúde (item 7).`);
+    if(decR.length)dest.push(`${decR.length} decisão(ões) nos últimos 60 dias: ${decFav.length} favorável(is) e ${decDesf.length} desfavorável(is) aos estatutários (item 8).`);
+    dest.forEach(t=>C.push(P(t,{bullet:true,after:80})));
+
+    C.push(H1("2. Exposição por estatutário"));
+    const porEst=grp(vivos,p=>estOf(p).length?estOf(p).map(estNome):["Estatutários a indicar"]);
+    C.push(table([{h:"Estatutário / diretor",w:3.4},{h:"Incidentes",w:1.2,a:"c"},{h:"Acolhidos",w:1.2,a:"c"},{h:"Defesa pendente",w:1.4,a:"c"},{h:"Valor da execução",w:2.2,a:"r"}],
+      porEst.map(([k,a])=>[k,String(a.length),String(a.filter(p=>acolh.includes(p)).length),String(a.filter(p=>pend.includes(p)).length),R$(sum(a,ex))]),(ri,ci,v)=>ci===2&&v!=="0"?{color:RED,bold:true}:null));
+    C.push(NOTE("Um mesmo incidente pode incluir mais de um estatutário; por isso a soma desta tabela pode passar do total da carteira."));
+
+    C.push(H1("3. Situação dos incidentes"));C.push(tabGrp("Fase do IDPJ",vivos,fase,FASE_ORD,(ri,ci,v)=>ci===0&&/pendente|acolhido/.test(v)?{color:RED,bold:true}:ci===0&&/rejeitado/.test(v)?{color:GRN,bold:true}:null));
+
+    C.push(H1("4. Defesas pendentes e prazos"));
+    if(!pend.length&&!pzD.length)C.push(P("Nenhuma defesa pendente."));
+    else{const linhas=[...new Set([...pend.map(p=>p.numero),...pzD.map(z=>z.processo)])].map(n=>{const p=procOf(n)||{numero:n,partes:""};const z=pzD.find(x=>x.processo===n);
+        return [`${n}\n${p.partes||""}`,estOf(p).map(estNome).join("\n")||"a indicar",p.idpjCitacao?fmtDate(p.idpjCitacao):"—",z?fmtDate(z.data):"sem prazo lançado",R$(ex(p))]}).sort((a,b)=>a[3].localeCompare(b[3]));
+      C.push(table([{h:"Processo / reclamante",w:3},{h:"Estatutários",w:2.6},{h:"Citação",w:1.2,a:"c"},{h:"Prazo fatal",w:1.4,a:"c"},{h:"Execução",w:1.6,a:"r"}],linhas,(ri,ci,v)=>ci===3&&/sem prazo/.test(v)?{color:RED,bold:true}:null))}
+
+    C.push(H1("5. Incidentes acolhidos"));
+    if(!acolh.length)C.push(P("Nenhum incidente acolhido."));
+    else C.push(table([{h:"Processo / reclamante",w:3},{h:"Estatutários incluídos",w:2.8},{h:"Decisão",w:2.2},{h:"Execução",w:1.6,a:"r"}],
+      acolh.sort((a,b)=>ex(b)-ex(a)).map(p=>{const d=decs.filter(x=>x.processoId===p.id).sort((a,b)=>(b.data||"").localeCompare(a.data||""))[0];return [`${p.numero}\n${p.partes||""}`,estOf(p).map(estNome).join("\n")||"—",d?`${decShort(d.tipo)} ${fmtDate(d.data)}\n${d.resultado||""}`:relCut(p.idpjResultado||p.idpjFase,80),R$(ex(p))]})));
+
+    C.push(H1("6. Risco crítico ou alto"));
+    if(!ca.length)C.push(P("Nenhum incidente classificado como risco crítico ou alto."));
+    else C.push(table([{h:"Processo / reclamante",w:3},{h:"Unidade",w:2},{h:"Fase do IDPJ",w:2},{h:"Risco",w:1},{h:"Execução",w:1.6,a:"r"}],
+      ca.map(p=>[`${p.numero}\n${p.partes||""}`,p.unidade||"",fase(p),p.risco,R$(ex(p))]),(ri,ci,v)=>ci===3?{color:rkColor(v),bold:true}:null));
+
+    C.push(H1("7. Quadro Geral de Credores"));C.push(tabGrp("Situação no QGC",vivos,p=>qgcShort(p.qgc)));
+
+    C.push(H1("8. Decisões dos últimos 60 dias"));
+    if(!decR.length)C.push(P("Nenhuma decisão registrada no período."));
+    else C.push(table([{h:"Data",w:1.3,a:"c"},{h:"Processo / reclamante",w:3},{h:"Decisão",w:1.6},{h:"Resultado do IDPJ",w:2.6},{h:"Valor",w:1.5,a:"r"}],
+      decR.map(d=>{const p=procs.find(x=>x.id===d.processoId)||procOf(d.numero)||{};return [fmtDate(d.data),`${d.numero||p.numero||""}\n${p.partes||""}`,decShort(d.tipo),d.respICDS||d.resultado||"—",typeof d.valorCondenacao==="number"?R$(d.valorCondenacao):"—"]}),
+      (ri,ci,v)=>ci===3&&/rejeitado|extinto/i.test(v)?{color:GRN,bold:true}:ci===3&&/acolhido/i.test(v)?{color:RED,bold:true}:null));
+
+    const crit=vivos.filter(p=>destOf(p).includes(CRIT));
+    C.push(H1("9. Pontos de atenção"));
+    if(!crit.length)C.push(P("Nenhum processo com alerta crítico de acompanhamento."));
+    else crit.forEach(p=>C.push(P([tr(`${p.partes||p.numero} (${p.numero}): `,{bold:true}),tr(relCut(p.observacoes||p.fase||"alerta crítico de acompanhamento",300))],{bullet:true,after:80})));
+
+    C.push(H1("10. Agenda – audiências e prazos por mês"));
+    C.push(table([{h:"Mês",w:3},{h:"Audiências",w:2,a:"c"},{h:"Prazos",w:2,a:"c"}],[...meses.map(ym=>[mesNome(ym)+(ym===ymHoje?" (atual)":""),String(audsM(ym)),String(pzsM(ym))]),total(["Total",String(meses.reduce((s,ym)=>s+audsM(ym),0)),String(meses.reduce((s,ym)=>s+pzsM(ym),0))])],(ri,ci,v,r)=>/\(atual\)/.test(r[0])?{bold:true,fill:SOFT}:null));
+    C.push(NOTE("Valor da execução: planilha da insolvência da Pró-Saúde. Processos conexos não somam em dobro."));
+    C.push(P([tr("Documento confidencial, de uso interno da Diretoria.",{size:16,it:true,color:MUT})],{before:360,align:AlignmentType.CENTER}));
+  }
+  const titulo=macro?"Relatório Consolidado – IDPJ Estatutários":"Relatório Executivo – IDPJ Estatutários (confidencial)";
+  const doc=new Document({creator:"Pauta IDPJ",title:titulo,styles:{default:{document:{run:{font:FONT,size:20}}}},
+    numbering:{config:[{reference:"bul",levels:[{level:0,format:LevelFormat.BULLET,text:"•",alignment:AlignmentType.LEFT,style:{paragraph:{indent:{left:360,hanging:240}}}}]}]},
+    sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1418,bottom:1418,left:1440,right:1440,header:708,footer:708}}},
+      headers:{default:new Header({children:[new Paragraph({alignment:AlignmentType.RIGHT,children:[tr(macro?"IDPJ · Estatutários Pró-Saúde · visão consolidada":"IDPJ · Estatutários Pró-Saúde · CONFIDENCIAL",{size:15,color:MUT})]})]})},
+      footers:{default:new Footer({children:[new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({children:["Página ",PageNumber.CURRENT," de ",PageNumber.TOTAL_PAGES],font:FONT,size:15,color:MUT})]})]})},
+      children:C}]});
+  const blob=await Packer.toBlob(doc);
+  await downloads.save({filename:macro?`Relatorio_IDPJ_Consolidado_${relHojeTag()}.docx`:`Relatorio_IDPJ_Diretoria_CONFIDENCIAL_${relHojeTag()}.docx`,data:blob});
+  toast(macro?"Relatório macro baixado.":"Relatório da Diretoria baixado.");
+  }catch(e){console.error(e);toast(e&&e.message==="load"?"Não consegui carregar o gerador de Word. Verifique a internet e tente de novo.":"Não foi possível gerar o relatório.")}
+  finally{btn.disabled=false;btn.textContent=txt0}}
+$("#btnExecTop").onclick=()=>gerarRelatorioWord(false,$("#btnExecTop"));
+$("#btnMacroTop").onclick=()=>gerarRelatorioWord(true,$("#btnMacroTop"));
+/* os relatórios aparecem para quem pode baixar arquivos (mesma regra da exportação) */
+new MutationObserver(()=>{const h=$("#btnCsv").hidden;$("#btnExecTop").hidden=h;$("#btnMacroTop").hidden=h}).observe($("#btnCsv"),{attributes:true,attributeFilter:["hidden"]});
 
 /* expõe funções puras para teste */
 $("#pDest").addEventListener("change",renderProc);
